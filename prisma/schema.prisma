@@ -1,0 +1,166 @@
+// Prisma Schema for OSHA Logbook Application
+// Database: Neon Postgres (Serverless PostgreSQL)
+// Provider: PostgreSQL 15+ compatible
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Neon uses connection pooling by default via the connection string
+  // Use the pooled connection string format for production:
+  // postgresql://user:pass@ep-xxx.pooler.us-east-1.neon.tech/dbname
+}
+
+/// OSHA Form 300/301 Incident Records
+/// Represents individual workplace incident reports with detailed narratives
+/// Maps directly to official OSHA Form 300 (Log of Work-Related Injuries and Illnesses)
+/// and Form 301 (Injury and Illness Incident Report)
+model OSHAIncident {
+  // Primary identifier
+  id                     String   @id @default(uuid())
+  
+  // Establishment Information
+  establishment_name     String
+  year_of_filing         Int
+  case_number            Int
+  
+  // Employee Information
+  job_title              String
+  date_of_birth          String   // Stored as string to match OSHA format (MM/DD/YYYY)
+  date_of_hire           String   // Stored as string to match OSHA format (MM/DD/YYYY)
+  sex                    String?  // M, F, or blank per OSHA requirements
+  
+  // Incident Details
+  date_of_incident       String   // OSHA format (MM/DD/YYYY)
+  time_of_incident       String?
+  time_started_work      String?
+  time_unknown           Boolean  @default(false)
+  incident_location      String
+  incident_description   String   @db.Text
+  
+  // Classification (maps to OSHA coding)
+  /// Incident Outcome: 1=Death, 2=Days away, 3=Job transfer/restriction, 4=Other recordable, 5=Privacy case, 6=Not recorded
+  incident_outcome       Int
+  
+  /// Days Away From Work (DAFW)
+  dafw_num_away          Int      @default(0)
+  
+  /// Days of Job Transfer or Restriction (DJTR)
+  djtr_num_tr            Int      @default(0)
+  
+  /// Type of Incident: 1=Injury, 2=Skin disorder, 3=Respiratory, 4=Poisoning, 5=Hearing loss, 6=Other illness
+  type_of_incident       Int
+  
+  // Treatment Information
+  /// 1=Emergency Room, 2=Doctor's Office, 3=Urgent Care, etc.
+  treatment_facility_type Int?
+  
+  /// 0=No, 1=Yes
+  treatment_in_patient    Int?
+  
+  // Form 301 Narrative Fields (detailed incident description)
+  /// What was the employee doing just before the incident occurred?
+  nar_before_incident    String   @db.Text
+  
+  /// What happened? Describe the sequence of events and injury/illness
+  nar_what_happened      String   @db.Text
+  
+  /// What was the injury or illness? Part of body affected?
+  nar_injury_illness     String   @db.Text
+  
+  /// What object or substance directly harmed the employee?
+  nar_object_substance   String   @db.Text
+  
+  // Optional Fields
+  date_of_death          String?  // Only if incident_outcome = 1
+  
+  // Audit fields
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+  
+  @@index([establishment_name, year_of_filing])
+  @@index([date_of_incident])
+  @@index([case_number])
+  @@map("osha_incidents")
+}
+
+/// OSHA Form 300A Annual Summary
+/// Annual summary of work-related injuries and illnesses
+/// Maps to official OSHA Form 300A (Summary of Work-Related Injuries and Illnesses)
+/// Required to be posted in workplace from February 1 to April 30
+model OSHA300ASummary {
+  // Primary identifier
+  id                              String   @id @default(uuid())
+  
+  // Establishment Information
+  establishment_name              String
+  ein                             String   // Employer Identification Number
+  company_name                    String
+  street_address                  String
+  city                            String
+  state                           String
+  zip                             String
+  
+  // Industry Classification
+  naics_code                      String   // North American Industry Classification System
+  industry_description            String
+  
+  /// 1=Single establishment, 2=Branch, 3=Other
+  establishment_type              Int
+  
+  /// Number of employees (1=1-10, 2=11-50, 3=51-250, 4=251-1000, 5=1000+)
+  size                            Int
+  
+  // Annual Period
+  year_filing_for                 Int
+  
+  // Employment Information
+  annual_average_employees        Int
+  total_hours_worked              Int
+  
+  // Incident Totals
+  /// Check if NO injuries/illnesses occurred during the year
+  no_injuries_illnesses           Int      @default(0)
+  
+  total_deaths                    Int      @default(0)
+  
+  /// Total DAFW cases (Days Away From Work)
+  total_dafw_cases                Int      @default(0)
+  
+  /// Total DJTR cases (Days of Job Transfer or Restriction)
+  total_djtr_cases                Int      @default(0)
+  
+  /// Other recordable cases (no days away, transfer, or restriction)
+  total_other_cases               Int      @default(0)
+  
+  /// Total days away from work
+  total_dafw_days                 Int      @default(0)
+  
+  /// Total days of job transfer or restriction
+  total_djtr_days                 Int      @default(0)
+  
+  // Injury and Illness Types (Breakdown by Category)
+  total_injuries                  Int      @default(0)
+  total_skin_disorders            Int      @default(0)
+  total_respiratory_conditions    Int      @default(0)
+  total_poisonings                Int      @default(0)
+  total_hearing_loss              Int      @default(0)
+  total_other_illnesses           Int      @default(0)
+  
+  // Optional Fields
+  /// Explanation if numbers changed from previous submission
+  change_reason                   String?  @db.Text
+  
+  // Audit fields
+  created_at                      DateTime @default(now())
+  updated_at                      DateTime @updatedAt
+  
+  @@unique([establishment_name, year_filing_for])
+  @@index([year_filing_for])
+  @@index([ein])
+  @@map("osha_300a_summaries")
+}
+

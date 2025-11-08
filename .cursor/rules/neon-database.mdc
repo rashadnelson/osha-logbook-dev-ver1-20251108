@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+---
+
+---
+description: Rules for configuring, accessing, and managing the Neon Postgres backend.
+globs: ["prisma/schema.prisma", "lib/db.ts", "env.*", "scripts/**", ".env*"]
+---
+
+- Never hardcode database connection strings; always source from an environment variable named `DATABASE_URL`.
+
+- Prefix all Neon-specific env vars (e.g., `NEON_PROJECT_ID`, `NEON_DATABASE`, etc.) with a comment explaining their purpose and whether they’re used by Prisma, the app runtime, or deployment platform.
+
+- Before generating Prisma client, validate the `schema.prisma` points to a Neon Postgres database with `provider = "postgresql"` and a valid connection URL.
+
+- In local development, ensure Neon is used via the free-tier branch endpoint, not the pooled production one.
+
+- Never store credentials in `.env` without also adding `.env*` to `.gitignore`.
+
+- When using Railway or Vercel, map the Neon connection string to `DATABASE_URL` through the deployment platform's environment settings, not in code.
+
+- In `lib/db.ts`, isolate PrismaClient instantiation and export a singleton. Prevent re-instantiation in serverless environments using global cache workaround.
+
+- Ensure all Prisma CLI commands (`migrate`, `generate`, `db push`) are scoped to the Neon branch appropriate for the current environment (dev vs prod).
+
+- Require all schema changes to be committed with a corresponding `prisma migrate dev` or `prisma migrate deploy` output.
+
+- When using preview features (e.g. full-text search, JSON columns), add a comment in `schema.prisma` explaining the Neon support level.
+
+- For backups and migrations, prefer using Neon’s CLI tools or dashboard snapshots, not ad hoc SQL dumps.
+
+- Never directly expose Neon connection strings in client-side code or Next.js public environment variables (`NEXT_PUBLIC_`).
+
+- Before production deploy, validate connection pooling, timeouts, and client reconnection strategies in `lib/db.ts`.
+
+- If using Neon branching, document branch purpose in `README.md` and ensure `DATABASE_URL` in each env file targets the correct branch.
+
